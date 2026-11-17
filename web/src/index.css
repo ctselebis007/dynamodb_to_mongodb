@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-mdb-green: #00ed64;
+  --color-mdb-forest: #00684a;
+  --color-mdb-slate: #001e2b;
+}

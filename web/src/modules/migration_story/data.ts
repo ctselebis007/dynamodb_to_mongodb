@@ -1,0 +1,334 @@
+/** Content for the transformation page. Values are real items from the synthetic workbook. */
+
+export type MapKind = 'kept' | 'unmarshal' | 'nested' | 'dropped' | 'derived'
+
+export const KINDS: Record<MapKind, { label: string; dot: string; bar: string; text: string }> = {
+  kept: { label: 'Kept as a plain field', dot: 'bg-sky-500', bar: 'border-sky-400', text: 'text-sky-800' },
+  unmarshal: { label: 'Native type (was S/N/BOOL/NULL)', dot: 'bg-violet-500', bar: 'border-violet-400', text: 'text-violet-800' },
+  nested: { label: 'Kept nested, now indexable', dot: 'bg-emerald-500', bar: 'border-emerald-400', text: 'text-emerald-800' },
+  dropped: { label: 'Key attribute replaced by an index', dot: 'bg-rose-500', bar: 'border-rose-400', text: 'text-rose-800' },
+  derived: { label: 'Added in MongoDB', dot: 'bg-amber-500', bar: 'border-amber-400', text: 'text-amber-800' },
+}
+
+export interface Field {
+  key: string
+  value: string
+  map: string
+}
+
+export interface Mapping {
+  id: string
+  kind: MapKind
+  title: string
+  detail: string
+}
+
+export interface IndexChip {
+  name: string
+  keys: string
+  map: string
+}
+
+export interface Transformation {
+  id: 'talent' | 'aicp'
+  table: string
+  collection: string
+  grain: string
+  dynamo: Field[]
+  mongo: Field[]
+  indexes: IndexChip[]
+  mappings: Mapping[]
+  footnote: string
+}
+
+const S = (v: string) => `{ "S": "${v}" }`
+
+export const TRANSFORMATIONS: Transformation[] = [
+  {
+    id: 'talent',
+    table: 'talent-rdf-quads',
+    collection: 'talent_quads',
+    grain: '15,651 items → 15,651 documents · one quad each',
+    dynamo: [
+      { key: 'PK', value: S('talent:costcenters#costcenter:9940406347'), map: 'pk' },
+      { key: 'SK', value: S('belongsToArea#area:WADI_MARBLE'), map: 'pk' },
+      { key: 'GSI1PK', value: S('talent:costcenters#area:WADI_MARBLE'), map: 'gsi' },
+      { key: 'GSI1SK', value: S('belongsToArea#costcenter:9940406347'), map: 'gsi' },
+      { key: 'graph', value: S('talent:costcenters'), map: 'quad' },
+      { key: 'subject', value: S('costcenter:9940406347'), map: 'quad' },
+      { key: 'predicate', value: S('belongsToArea'), map: 'quad' },
+      { key: 'object', value: S('area:WADI_MARBLE'), map: 'quad' },
+      { key: 'subject_label', value: S('9940406347'), map: 'labels' },
+      { key: 'object_label', value: S('WADI MARBLE'), map: 'labels' },
+    ],
+    mongo: [
+      { key: '_id', value: 'ObjectId("…")', map: 'id' },
+      { key: 'graph', value: '"talent:costcenters"', map: 'quad' },
+      { key: 'subject', value: '"costcenter:9940406347"', map: 'quad' },
+      { key: 'predicate', value: '"belongsToArea"', map: 'quad' },
+      { key: 'object', value: '"area:WADI_MARBLE"', map: 'quad' },
+      { key: 'object_kind', value: '"iri"', map: 'kind' },
+      { key: 'subject_label', value: '"9940406347"', map: 'labels' },
+      { key: 'object_label', value: '"WADI MARBLE"', map: 'labels' },
+    ],
+    indexes: [
+      { name: 'subject_predicate_object', keys: '{ subject, predicate, object }', map: 'pk' },
+      { name: 'object_predicate', keys: '{ object, predicate }', map: 'gsi' },
+      { name: 'graph_predicate_object_subject', keys: 'unique quad identity', map: 'quad' },
+      { name: 'talent_labels', keys: 'Atlas Search on both labels', map: 'labels' },
+    ],
+    mappings: [
+      {
+        id: 'pk',
+        kind: 'dropped',
+        title: 'PK / SK: composite strings → one compound index',
+        detail:
+          'PK = graph#subject and SK = predicate#object only repeat attributes the item already has. MongoDB indexes the real fields, so nothing has to be concatenated on write or parsed on read.',
+      },
+      {
+        id: 'gsi',
+        kind: 'dropped',
+        title: 'GSI copy keys → reverse-lookup index',
+        detail:
+          'GSI1PK / GSI1SK and the GSI-predicate exist only to read the graph backwards. One { object, predicate } index answers a reverse lookup for any predicate (T2). In DynamoDB an unknown predicate means a Scan.',
+      },
+      {
+        id: 'quad',
+        kind: 'kept',
+        title: 'The quad itself, unchanged',
+        detail:
+          'graph, subject, predicate and object keep their names and values. They are now ordinary fields that any query, $graphLookup or $lookup can use directly.',
+      },
+      {
+        id: 'labels',
+        kind: 'kept',
+        title: 'Labels → Atlas Search',
+        detail:
+          'The same strings get a full-text index in the same cluster. "Label contains LAGOON" (T6) becomes one $search instead of a full Scan of 15,651 items. No separate search engine and no sync pipeline.',
+      },
+      {
+        id: 'kind',
+        kind: 'derived',
+        title: 'object_kind: entity id or literal text',
+        detail:
+          'Set by the converter. rdfs:label quads carry the label text as their object, so T6 counts only real entities.',
+      },
+      {
+        id: 'id',
+        kind: 'derived',
+        title: '_id',
+        detail: 'Generated by MongoDB. Quad identity is enforced by a unique index on all four parts of the quad.',
+      },
+    ],
+    footnote: 'Every value is shown as DynamoDB holds it ({ "S": … }) and as MongoDB stores it.',
+  },
+  {
+    id: 'aicp',
+    table: 'aicp-quads',
+    collection: 'aicp_items',
+    grain: '818 items, 9 item kinds → 818 documents in one collection',
+    dynamo: [
+      { key: 'pk', value: S('QUADS#LIVE'), map: 'keys' },
+      { key: 'sk', value: S('ENTITY#A4'), map: 'keys' },
+      { key: 'kind', value: S('entity'), map: 'plain' },
+      { key: 'id', value: S('A4'), map: 'plain' },
+      { key: 'status', value: S('Open'), map: 'plain' },
+      { key: 'itemVersion', value: '{ "N": "2" }', map: 'types' },
+      { key: 'liveRevision', value: '{ "N": "4" }', map: 'types' },
+      { key: 'idStable', value: '{ "BOOL": true }', map: 'types' },
+      { key: 'confidence', value: '{ "NULL": true }', map: 'types' },
+      { key: 'types', value: '{ "L": [ { "S": "Action" } ] }', map: 'types' },
+      {
+        key: 'facts',
+        value:
+          '{ "L": [ { "M": { "graph": { "S": "inferred" }, "predicate": { "S": "…/relatesTo" }, "object": { "M": { "kind": { "S": "iri" }, "id": { "S": "IR07" } } } } }, … 9 more ] }',
+        map: 'facts',
+      },
+    ],
+    mongo: [
+      { key: '_id', value: '"QUADS#LIVE|ENTITY#A4"', map: 'id' },
+      { key: 'pk', value: '"QUADS#LIVE"', map: 'keys' },
+      { key: 'sk', value: '"ENTITY#A4"', map: 'keys' },
+      { key: 'kind', value: '"entity"', map: 'plain' },
+      { key: 'id', value: '"A4"', map: 'plain' },
+      { key: 'status', value: '"Open"', map: 'plain' },
+      { key: 'itemVersion', value: '2', map: 'types' },
+      { key: 'liveRevision', value: '4', map: 'types' },
+      { key: 'idStable', value: 'true', map: 'types' },
+      { key: 'confidence', value: 'null', map: 'types' },
+      { key: 'types', value: '[ "Action" ]', map: 'types' },
+      {
+        key: 'facts',
+        value: '[ { graph: "inferred", predicate: "…/relatesTo", object: { kind: "iri", id: "IR07" } }, … 9 more ]',
+        map: 'facts',
+      },
+      { key: 'embedding', value: '[ 1024 floats ]', map: 'vector' },
+    ],
+    indexes: [
+      { name: 'pk_sk', keys: 'unique { pk, sk }', map: 'keys' },
+      { name: 'pk_facts_object_id', keys: '{ pk, facts.object.id }, multikey', map: 'facts' },
+      { name: 'pk_reifies_subject', keys: '{ pk, reifies.triple.subject.id }', map: 'facts' },
+      { name: 'aicp_semantic', keys: 'Vector Search on embedding', map: 'vector' },
+    ],
+    mappings: [
+      {
+        id: 'keys',
+        kind: 'kept',
+        title: 'pk / sk kept, but no longer the only way in',
+        detail:
+          'pk tells the snapshots apart (v1.02, LIVE) and sk the item kind, as before. They are ordinary indexed fields now: claims, history and entities sit in one collection and you can filter on any other field too.',
+      },
+      {
+        id: 'plain',
+        kind: 'kept',
+        title: 'Plain attributes',
+        detail: 'Same names, same values, stored as native strings. 18 more attributes on this item map the same way.',
+      },
+      {
+        id: 'types',
+        kind: 'unmarshal',
+        title: 'DynamoDB type descriptors → native BSON',
+        detail:
+          'Numbers are numbers, booleans are booleans and NULL is null. Range filters, sorts and math work without client-side unmarshalling (A5 uses itemVersion > 0).',
+      },
+      {
+        id: 'facts',
+        kind: 'nested',
+        title: 'Nested facts stay nested, and become indexable',
+        detail:
+          'The facts list stays inside its item, as you asked. A multikey index on facts.object.id answers "who points at X?" (A2) in one call; in DynamoDB that needs a Scan plus code. Triple terms in reifies are indexed the same way (A3).',
+      },
+      {
+        id: 'id',
+        kind: 'derived',
+        title: '_id = pk|sk',
+        detail: 'A readable, deterministic primary key built from the DynamoDB key. Reloads are idempotent.',
+      },
+      {
+        id: 'vector',
+        kind: 'derived',
+        title: 'Embedding for semantic search',
+        detail:
+          'Label and comment text is embedded and indexed with Atlas Vector Search in the same collection, so AI agents can ask in natural language.',
+      },
+    ],
+    footnote: 'Item: entity A4 in the LIVE snapshot (an edited item, itemVersion 2). Values abbreviated with "…".',
+  },
+]
+
+export interface RoundTrip {
+  id: string
+  question: string
+  calls: number | null
+  dynamo: string
+}
+
+/** DynamoDB call counts from Sample_Queries_Criteria.md; `null` = needs a Scan. */
+export const ROUND_TRIPS: RoundTrip[] = [
+  { id: 'T3', question: 'Subtree under a business, 3 levels', calls: 55, dynamo: '55 Queries, one per node' },
+  { id: 'T5', question: 'Lines + GitHub cost centre (cross-graph)', calls: 23, dynamo: '23 Queries' },
+  { id: 'A5', question: 'Snapshot diff v1.02 → LIVE', calls: 3, dynamo: '2 GetItems + history Query + code' },
+  { id: 'T1', question: 'Direct children of a business', calls: 1, dynamo: '1 Query' },
+  { id: 'T2', question: 'Cost centres in an area (reverse)', calls: 1, dynamo: '1 GSI Query; Scan if predicate unknown' },
+  { id: 'T4', question: 'Path up to the business', calls: 1, dynamo: '1 Query' },
+  { id: 'A1', question: 'Every fact about an entity', calls: 1, dynamo: '1 GetItem' },
+  { id: 'A4', question: 'Claims with stance lists', calls: 1, dynamo: '1 Query' },
+  { id: 'T6', question: 'Label contains a word', calls: null, dynamo: 'Full Scan of 15,651 items' },
+  { id: 'T7', question: 'Cost centres per business, top 5', calls: null, dynamo: 'Full Scan + code' },
+  { id: 'A2', question: 'Who points at an entity (nested)', calls: null, dynamo: 'Scan of the snapshot + code' },
+  { id: 'A3', question: 'Reified statements about a subject', calls: null, dynamo: 'Scan + code' },
+]
+
+export interface AccessPattern {
+  need: string
+  dynamo: string
+  mongo: string
+  queries: string
+}
+
+export const ACCESS_PATTERNS: AccessPattern[] = [
+  { need: 'Forward: subject → objects', dynamo: 'Query on PK = graph#subject', mongo: 'Index { subject, predicate, object }', queries: 'T1, T4' },
+  { need: 'Reverse: object → subjects', dynamo: 'GSI-predicate (predicate must be known), else Scan', mongo: 'Index { object, predicate }, any predicate', queries: 'T2' },
+  { need: 'Multi-hop traversal', dynamo: 'One Query per node, loop in the client', mongo: '$graphLookup, one call, depth 1–5', queries: 'T3' },
+  { need: 'Join across named graphs', dynamo: 'One Query per line, join in code', mongo: '$lookup on the same index', queries: 'T5' },
+  { need: 'Text search on labels', dynamo: 'Full Scan + contains filter', mongo: 'Atlas Search index, $search', queries: 'T6' },
+  { need: 'Group and count', dynamo: 'Scan + code', mongo: '$group / $sortByCount on the server', queries: 'T7' },
+  { need: 'Search inside nested lists', dynamo: 'Scan + code', mongo: 'Multikey index on facts.object.id', queries: 'A2' },
+  { need: 'RDF 1.2 triple terms', dynamo: 'Scan + code', mongo: 'Index on reifies.triple.subject.id', queries: 'A3' },
+  { need: 'Compare snapshots', dynamo: '2 GetItems + Query + code', mongo: 'One pipeline: $lookup by sk + history', queries: 'A5' },
+  { need: 'Natural-language questions', dynamo: 'Not built in (separate service + sync)', mongo: 'Vector Search index, $vectorSearch', queries: 'Bonus' },
+]
+
+export interface Benefit {
+  title: string
+  body: string
+  proof: string
+}
+
+export const SIMPLIFICATION: Benefit[] = [
+  {
+    title: 'One call per question',
+    body: '$graphLookup, $lookup and $unionWith run on the server. Client-side loops of Queries go away, and so do the extra tool calls an AI agent makes for each hop.',
+    proof: 'T3: 55 → 1 · T5: 23 → 1',
+  },
+  {
+    title: 'No key overloading',
+    body: 'No graph#subject strings to build on write and split on read. The fields are the keys.',
+    proof: '4 key attributes dropped per quad',
+  },
+  {
+    title: 'Native types',
+    body: 'No { "S" } / { "N" } / { "BOOL" } descriptors to marshal. Numbers sort and compare as numbers.',
+    proof: 'A5 filters itemVersion > 0',
+  },
+  {
+    title: 'Search built in',
+    body: 'Full-text and vector search run on the same cluster and the same documents. No second store, no sync job, no drift.',
+    proof: 'T6 + semantic search',
+  },
+  {
+    title: 'Scans become pipelines',
+    body: 'Counting, grouping and diffing happen in one aggregation instead of a Scan plus application code.',
+    proof: 'T7, A2, A3, A5: Scan → 1 call',
+  },
+]
+
+export const FLEXIBILITY: Benefit[] = [
+  {
+    title: 'Index any field, any time',
+    body: 'Add an index on any field, including inside nested arrays (multikey), with no new key design and no duplicated key attributes. New questions don’t require a remodel.',
+    proof: 'facts.object.id, reifies.triple.subject.id',
+  },
+  {
+    title: 'Ask in any direction',
+    body: 'Forward, reverse, multi-hop and cross-graph questions run on the same documents. Reverse lookups work for any predicate, known or not.',
+    proof: 'T2 without naming a GSI',
+  },
+  {
+    title: 'Flexible schema',
+    body: 'Documents in one collection can have different shapes. A new source needs only an extractor, with no schema change; validation rules are optional.',
+    proof: '9 item kinds in aicp_items',
+  },
+  {
+    title: 'Room to grow',
+    body: 'Documents can hold up to 16 MB (DynamoDB items: 400 KB). The largest item today is ~27 KB, so nested facts can keep growing in place.',
+    proof: '~600× headroom on the largest item',
+  },
+  {
+    title: 'Multi-document transactions',
+    body: 'Delete a quad and insert its replacement atomically, or reload a whole named graph with readers seeing either old or new data, never a mix.',
+    proof: 'Writes tab: commit, rollback, reload',
+  },
+  {
+    title: 'Snapshots as data',
+    body: 'Snapshots v1.02 and LIVE are a pk value in one collection, so comparing versions is one aggregation, not one table or partition per snapshot.',
+    proof: 'A5: 2 entities, 4 changes, 1 call',
+  },
+]
+
+export const FIDELITY = [
+  { value: '15,651', label: 'quads → documents, 1:1' },
+  { value: '818', label: 'aicp items → documents, 1:1' },
+  { value: '4,974', label: 'facts still nested in their items' },
+  { value: '12 / 12', label: 'sample answers match the ideal answer' },
+]

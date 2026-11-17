@@ -1,0 +1,51 @@
+[project]
+name = "demo-api"
+version = "0.1.0"
+description = "FastAPI backend for a MongoDB Atlas demo"
+requires-python = ">=3.12"
+dependencies = [
+    "certifi>=2026.10.23",
+    "fastapi>=0.162.0",
+    "httpx>=0.28.1",
+    "pydantic>=2.14.3",
+    "pymongo>=4.19.0",
+    "python-dotenv>=1.2.4",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests", "app/modules"]
+pythonpath = ["."]
+addopts = "--import-mode=importlib"
+markers = ["atlas: integration tests against MONGODB_URI_TEST (skipped if unset)"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+include = ["app", "tests", "conftest.py"]
+venvPath = "."
+venv = ".venv"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1.post1",
+    "respx>=0.23.1",
+    "ruff>=0.17.4",
+]

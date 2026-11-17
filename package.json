@@ -1,0 +1,24 @@
+{
+  "name": "test-demo-blank",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "web"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"uv run --directory api uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload\" \"npm -w web run dev\"",
+    "build": "npm -w web run build",
+    "test": "npm run test:api && npm run test:web",
+    "test:api": "uv run --directory api pytest",
+    "test:web": "npm -w web run test",
+    "lint": "uv run --directory api ruff check . && uv run --directory api ruff format --check . && npm -w web run lint",
+    "typecheck": "uv run --directory api pyright && npm -w web run typecheck",
+    "gen:types": "node scripts/gen-types.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}
