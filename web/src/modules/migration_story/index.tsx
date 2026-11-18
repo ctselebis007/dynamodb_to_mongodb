@@ -9,6 +9,7 @@ import {
   TRANSFORMATIONS,
   type Benefit,
 } from './data'
+import { ClusterSizing } from './ClusterSizing'
 import { FieldMapper } from './FieldMapper'
 
 const MAX_CALLS = Math.max(...ROUND_TRIPS.map((r) => r.calls ?? 0))
@@ -249,6 +250,7 @@ export function MigrationStoryPage() {
       <AccessPatterns />
       <Benefits />
       <Fidelity />
+      <ClusterSizing />
     </div>
   )
 }

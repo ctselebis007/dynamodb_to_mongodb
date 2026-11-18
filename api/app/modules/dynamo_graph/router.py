@@ -182,11 +182,24 @@ class ReloadRequest(BaseModel):
     graph: Literal["talent:hierarchy", "talent:costcenters", "talent:github", "talent:metadata"]
 
 
+class ReloadStep(ApiModel):
+    name: str
+    op: str
+    kind: Literal["app", "aggregate", "write", "txn"]
+    in_transaction: bool
+    command: dict[str, Any] | list[dict[str, Any]]
+    docs: int | None = None
+    ms: float
+    result: str
+
+
 class ReloadResult(ApiModel):
     graph: str
     deleted: int
     inserted: int
     ms: float
+    total_ms: float
+    steps: list[ReloadStep]
 
 
 def _parse_inputs(model: type[_Inputs], raw: dict[str, Any]) -> _Inputs:

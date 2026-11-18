@@ -452,6 +452,36 @@ export interface components {
             inserted: number;
             /** Ms */
             ms: number;
+            /** Total Ms */
+            total_ms: number;
+            /** Steps */
+            steps: components["schemas"]["ReloadStep"][];
+        };
+        /** ReloadStep */
+        ReloadStep: {
+            /** Name */
+            name: string;
+            /** Op */
+            op: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "app" | "aggregate" | "write" | "txn";
+            /** In Transaction */
+            in_transaction: boolean;
+            /** Command */
+            command: {
+                [key: string]: unknown;
+            } | {
+                [key: string]: unknown;
+            }[];
+            /** Docs */
+            docs: number | null;
+            /** Ms */
+            ms: number;
+            /** Result */
+            result: string;
         };
         /** ReplaceRequest */
         ReplaceRequest: {

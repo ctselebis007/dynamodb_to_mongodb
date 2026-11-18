@@ -11,7 +11,8 @@ A MongoDB Atlas demo built with the MongoDB Demo Kit. Synthetic data only.
 - **Transformation** page (works before seeding): an interactive, field-by-field view of how each DynamoDB item becomes a MongoDB document, with round-trip comparisons, the key-design → index map, and the simplification and flexibility benefits
 - **Sample Queries** page: the 12 sample queries from [`Sample_Queries_Criteria.md`](design_resources/Sample_Queries_Criteria.md) (T1–T7 over the talent quads, A1–A5 over the RDF 1.2 items), each in one aggregation, compared with its ideal answer (✅/❌), with a "Run ×20" p50/p95 timer
 - Multi-hop traversal across named graphs with one `$graphLookup` (T3), Atlas Search on labels (T6), nested reverse lookups on `facts` (A2) and RDF 1.2 triple terms (A3)
-- Write demos: atomic quad replace in a transaction (with simulated rollback) and a timed named-graph reload
+- Write demos: atomic quad replace in a transaction (with simulated rollback) and a named-graph reload with a per-step timeline (fixture read, before/after aggregation pipelines, `deleteMany`, each `insertMany` batch, commit)
+- Transformation page sizing: base cluster tier (M30+) and dedicated Search Node tier (S20+) for the current, near-term and horizon volumes, projected from per-document sizes measured on the seeded data ([`sizing.ts`](web/src/modules/migration_story/sizing.ts))
 - Bonus semantic search (`$vectorSearch`) over the LIVE snapshot
 <!-- features:end -->
 

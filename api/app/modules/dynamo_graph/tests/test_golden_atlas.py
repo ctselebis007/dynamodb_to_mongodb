@@ -86,5 +86,10 @@ async def test_golden_answers_and_writes(atlas_db, monkeypatch: pytest.MonkeyPat
     # Reloading the graph restores the workbook state.
     reload = await writes.reload_graph(atlas_db, "talent:metadata")
     assert reload["deleted"] == reload["inserted"] == 5602
+    ops = [s["op"] for s in reload["steps"]]
+    assert ops[:2] == ["fixture read", "aggregate"]
+    assert ops[-2:] == ["commitTransaction", "aggregate"]
+    assert ops.count("insertMany") == 6 and ops.count("deleteMany") == 1
+    assert reload["steps"][-1]["docs"] == 5602
     assert await atlas_db[seed.TALENT].count_documents({}) == total
     assert await atlas_db[seed.TALENT].count_documents(quad | {"object": label}) == 1
